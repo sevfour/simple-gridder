@@ -1,0 +1,11 @@
+ds_name: ecco
+input_dir: "/Users/marlis/Developer/SLI/ECCO_along_track"
+output_dir: ""
+file_format: .nc
+filename_date_regex: '\d{4}-\d{2}-\d{2}'
+grid_frequency: 10
+
+gridding_params:
+  roi: 6.0e+5
+  sigma: 1.0E+5
+  neighbours: 500

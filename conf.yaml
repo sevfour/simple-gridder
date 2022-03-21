@@ -1,7 +1,7 @@
 ds_name: ecco
 #input_dir: "/Users/marlis/Developer/SLI/ECCO_along_track"  #kevin
-input_dir: "~/Data/ECCO_GMSL/ECCO_V4r4_alongtrack_output"  #when ran locally or on the cloud
-output_dir: "~/Data/ECCO_GMSL/gridding_output"
+input_dir: "/home/jovyan/Data/ECCO_GMSL/ECCO_V4r4_alongtrack_output"  #when ran locally or on the cloud
+output_dir: "/home/jovyan/Data/ECCO_GMSL/gridding_output"
 file_format: .nc
 filename_date_regex: '\d{4}-\d{2}-\d{2}'
 grid_frequency: 10

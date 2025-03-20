@@ -1,3 +1,4 @@
+import glob
 import logging
 import logging.config
 import os
@@ -26,7 +27,7 @@ log = logging.getLogger(__name__)
 with open('conf.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
-ALL_DATES = np.arange('1992-01-01', 'now',
+ALL_DATES = np.arange('1992-10-05', 'now',
                       config['grid_frequency'], dtype='datetime64[D]')
 
 try:
@@ -37,7 +38,7 @@ try:
     else:
         GRID_OUTPUT_DIR = INPUT_DIR / 'simple_grids'
 
-    DS_NAME = config['ds_name']
+    PREPROCESSING = config['preprocessing']
     DATE_REGEX = config['filename_date_regex']
 except Exception as e:
     print(e)
@@ -45,70 +46,70 @@ except Exception as e:
     exit()
 
 
-def s6_preprocessing():
-    '''
-    Function that prepares along track data for gridding by subsetting relevant 
-    data variables, filtering data through the use of flags or any other constraint,
-    and saving processed data in directory.
-    '''
-    print('Preprocessing Sentinel6 along track data')
+# def s6_preprocessing():
+#     '''
+#     Function that prepares along track data for gridding by subsetting relevant
+#     data variables, filtering data through the use of flags or any other constraint,
+#     and saving processed data in directory.
+#     '''
+#     print('Preprocessing Sentinel6 along track data')
 
-    data_dir = INPUT_DIR
-    output_dir = INPUT_DIR / 'processed'
-    output_dir.mkdir(exist_ok=True)
+#     data_dir = INPUT_DIR
+#     output_dir = INPUT_DIR / 'processed'
+#     output_dir.mkdir(exist_ok=True)
 
-    for granule in [f for f in os.listdir(data_dir) if f[-2:] == 'nc']:
-        data_01_ds = xr.open_dataset(f'{data_dir}{granule}', group='data_01')
-        ku_ds = xr.open_dataset(f'{data_dir}{granule}', group='data_01/ku')
-        c_ds = xr.open_dataset(f'{data_dir}{granule}', group='data_01/c')
+#     for granule in [f for f in os.listdir(data_dir) if f[-2:] == 'nc']:
+#         data_01_ds = xr.open_dataset(f'{data_dir}{granule}', group='data_01')
+#         ku_ds = xr.open_dataset(f'{data_dir}{granule}', group='data_01/ku')
+#         c_ds = xr.open_dataset(f'{data_dir}{granule}', group='data_01/c')
 
-        data_01_das = ['longitude', 'latitude', 'time', 'surface_classification_flag',
-                       'rain_flag', 'rad_rain_flag', 'rad_sea_ice_flag']
-        ku_das = ['ssha', 'range_ocean_qual']
-        c_das = ['range_ocean_qual']
+#         data_01_das = ['longitude', 'latitude', 'time', 'surface_classification_flag',
+#                        'rain_flag', 'rad_rain_flag', 'rad_sea_ice_flag']
+#         ku_das = ['ssha', 'range_ocean_qual']
+#         c_das = ['range_ocean_qual']
 
-        all_das = []
-        for da in data_01_das:
-            all_das.append(data_01_ds[da])
+#         all_das = []
+#         for da in data_01_das:
+#             all_das.append(data_01_ds[da])
 
-        for da in ku_das:
-            all_das.append(ku_ds[da])
+#         for da in ku_das:
+#             all_das.append(ku_ds[da])
 
-        for da in c_das:
-            temp = c_ds[da]
-            temp.name = 'range_ocean_qual_c'
-            all_das.append(temp)
+#         for da in c_das:
+#             temp = c_ds[da]
+#             temp.name = 'range_ocean_qual_c'
+#             all_das.append(temp)
 
-        new_ds = xr.Dataset()
-        for da in all_das:
-            if da.name in ['longitude', 'latitude', 'time']:
-                continue
-            new_ds[da.name] = da
+#         new_ds = xr.Dataset()
+#         for da in all_das:
+#             if da.name in ['longitude', 'latitude', 'time']:
+#                 continue
+#             new_ds[da.name] = da
 
-        flags = ['surface_classification_flag', 'rain_flag',
-                 'rad_rain_flag', 'rad_sea_ice_flag', 'range_ocean_qual']
+#         flags = ['surface_classification_flag', 'rain_flag',
+#                  'rad_rain_flag', 'rad_sea_ice_flag', 'range_ocean_qual']
 
-        filtered_ds = xr.Dataset()
-        filtered_ds['SSHA'] = new_ds['ssha']
-        try:
-            for flag in new_ds.data_vars:
-                if flag == 'ssha':
-                    continue
-                filtered_ds['SSHA'] = filtered_ds['SSHA'].where(
-                    new_ds[flag] == 0.)
-            out_ds = filtered_ds.dropna('time')
-            if np.isnan(out_ds['SSHA'].values).all():
-                print('all nans', granule)
-            datetimeindex = out_ds.indexes['time'].to_datetimeindex()
-            out_ds['time'] = datetimeindex
+#         filtered_ds = xr.Dataset()
+#         filtered_ds['SSHA'] = new_ds['ssha']
+#         try:
+#             for flag in new_ds.data_vars:
+#                 if flag == 'ssha':
+#                     continue
+#                 filtered_ds['SSHA'] = filtered_ds['SSHA'].where(
+#                     new_ds[flag] == 0.)
+#             out_ds = filtered_ds.dropna('time')
+#             if np.isnan(out_ds['SSHA'].values).all():
+#                 print('all nans', granule)
+#             datetimeindex = out_ds.indexes['time'].to_datetimeindex()
+#             out_ds['time'] = datetimeindex
 
-            out_ds['SSHA'] = out_ds['SSHA'].where(abs(out_ds['SSHA']) <= 1.)
-            out_ds['SSHA'] = out_ds['SSHA'].where(
-                (out_ds['latitude'] > -60) & (abs(out_ds['SSHA']) <= 0.5))
-            out_ds = out_ds.dropna('time')
-            out_ds.to_netcdf(f'{output_dir}/{granule}')
-        except Exception as e:
-            log.exception(f'{granule}, {e}')
+#             out_ds['SSHA'] = out_ds['SSHA'].where(abs(out_ds['SSHA']) <= 1.)
+#             out_ds['SSHA'] = out_ds['SSHA'].where(
+#                 (out_ds['latitude'] > -60) & (abs(out_ds['SSHA']) <= 0.5))
+#             out_ds = out_ds.dropna('time')
+#             out_ds.to_netcdf(f'{output_dir}/{granule}')
+#         except Exception as e:
+#             log.exception(f'{granule}, {e}')
 
 
 def ecco_along_track_preprocessing(cycle_granules):
@@ -125,7 +126,7 @@ def ecco_along_track_preprocessing(cycle_granules):
 
     for granule in cycle_granules:
         try:
-            ds = xr.open_dataset(f'{INPUT_DIR}/{granule}')
+            ds = xr.open_dataset(granule)
 
             ds = ds.rename_vars(
                 {'SSH_at_xy': 'SSHA', 'lat': 'latitude', 'lon': 'longitude'})
@@ -137,8 +138,121 @@ def ecco_along_track_preprocessing(cycle_granules):
     return processed_granules
 
 
-preprocessers = {"sentinel6": s6_preprocessing,
-                 "ecco": ecco_along_track_preprocessing}
+def along_track_preprocessing(cycle_granules):
+    '''
+    Function that prepares along track data for gridding by subsetting relevant
+    data variables, filtering data through the use of flags or any other constraint,
+    and saving processed data in directory.
+
+    ECCO data only requires variable renaming.
+    '''
+    print('Preprocessing ECCO along track data')
+
+    processed_granules = []
+
+    for granule in cycle_granules:
+        try:
+            ds = xr.open_dataset(granule, group='data', engine='netcdf4')
+
+            ds = xr.Dataset(
+                data_vars=dict(
+                    SSHA=(['time'], ds.ssh.values),
+                    latitude=(['time'], ds.lats.values),
+                    longitude=(['time'], ds.lons.values),
+                    time=(['time'], ds.time.values)
+                )
+            )
+
+            ds.time.attrs = {
+                'long_name': 'time',
+                'standard_name': 'time',
+                'units': 'seconds since 1985-01-01',
+                'calendar': 'gregorian',
+            }
+
+            ds.latitude.attrs = {
+                'long_name': 'latitude',
+                'standard_name': 'latitude',
+                'units': 'degrees_north',
+                'comment': 'Positive latitude is North latitude, negative latitude is South latitude. FillValue pads the reference orbits to have same length'
+            }
+
+            ds.longitude.attrs = {
+                'long_name': 'longitude',
+                'standard_name': 'longitude',
+                'units': 'degrees_east',
+                'comment': 'East longitude relative to Greenwich meridian. FillValue pads the reference orbits to have same length'
+            }
+
+            ds.SSHA.attrs = {
+                'long_name': 'sea surface height anomaly',
+                'standard_name': 'sea_surface_height_above_sea_level',
+                'units': 'm',
+                'valid_min': np.nanmin(ds.SSHA.values),
+                'valid_max': np.nanmax(ds.SSHA.values),
+                'comment': 'Sea level determined from satellite altitude - range - all altimetric corrections',
+            }
+            processed_granules.append(ds)
+        except Exception as e:
+            print(e)
+            exit()
+
+    return processed_granules
+
+
+def gsfc_processing():
+    all_files = [f for f in glob.glob(
+        f'{INPUT_DIR}/**/*{config["file_format"]}', recursive=True)]
+    all_files.sort()
+
+    for granule in all_files:
+        at_ds = xr.open_dataset(granule)
+        cycle_start = np.datetime64(at_ds.attrs['time_coverage_start'])
+        cycle_end = np.datetime64(at_ds.attrs['time_coverage_end'])
+        cycle_center = cycle_start + (cycle_end - cycle_start)/2
+
+        print(f'Beginning processing of cycle centered on {cycle_center}')
+
+        ds = xr.Dataset(
+            data_vars=dict(
+                SSHA=(['time'], at_ds.ssha.values),
+                latitude=(['time'], at_ds.lat.values),
+                longitude=(['time'], at_ds.lon.values),
+                time=(['time'], at_ds.time.values)
+            )
+        )
+
+        ds.SSHA.attrs = {
+            'long_name': 'sea surface height anomaly',
+            'standard_name': 'sea_surface_height_above_sea_level',
+            'units': 'mm',
+            'valid_min': np.nanmin(ds.SSHA.values),
+            'valid_max': np.nanmax(ds.SSHA.values),
+            'comment': 'Sea level determined from satellite altitude - range - all altimetric corrections',
+        }
+
+        print(f'\tGridding cycle centered on {cycle_center}...')
+        gridded_ds = gridding(ds, cycle_center)
+        print(f'\tGridding cycle centered on {cycle_center} complete.')
+
+        # Save the gridded cycle
+        grid_dir = GRID_OUTPUT_DIR
+        grid_dir.mkdir(parents=True, exist_ok=True)
+        filename = f'SSHA_grid_{str(cycle_center).replace("-", "")[:8]}.nc'
+        filepath = grid_dir / filename
+        encoding = cycle_ds_encoding(gridded_ds)
+
+        gridded_ds.to_netcdf(filepath, encoding=encoding)
+
+
+preprocessers = {
+    "ecco": ecco_along_track_preprocessing,
+    "along_track": along_track_preprocessing
+}
+
+# preprocessers = {"sentinel6": s6_preprocessing,
+#                  "ecco": ecco_along_track_preprocessing,
+#                  "along_track": along_track_preprocessing}
 
 
 def collect_data(start, end):
@@ -148,9 +262,12 @@ def collect_data(start, end):
     '''
     cycle_granules = []
     try:
-        cycle_granules = [f for f in os.listdir(INPUT_DIR) if config['file_format'] in f and
+        all_files = [f for f in glob.glob(
+            f'{INPUT_DIR}/**/*{config["file_format"]}', recursive=True)]
+        cycle_granules = [f for f in all_files if config['file_format'] in f and
                           get_date(DATE_REGEX, f) <= end and get_date(DATE_REGEX, f) >= start]
         cycle_granules.sort()
+
     except Exception as e:
         log.exception(e)
 
@@ -327,8 +444,7 @@ def gridding(cycle_ds, cycle_center):
     }
 
     gridded_ds.attrs['gridding_method'] = \
-        f'Gridded using pyresample resample_gauss with roi={params["roi"]}, \
-            neighbours={params["neighbours"]}'
+        f'Gridded using pyresample resample_gauss with roi={params["roi"]}, neighbours={params["neighbours"]}, sigma={params["sigma"]}'
 
     # gridded_ds.attrs['source'] = 'Combination of ' + \
     #     ', '.join(sources) + ' along track instruments'
@@ -343,8 +459,6 @@ def cycle_ds_encoding(cycle_ds):
 
     Params:
         cycle_ds (Dataset): the Dataset object
-        ds_name (str): the name of the dataset (used to check if dataset is 1812)
-        center_date (datetime): used to set the units encoding in the 1812 dataset
 
     Returns:
         encoding (dict): the encoding dictionary for the cycle_ds Dataset object
@@ -375,14 +489,19 @@ def cycle_ds_encoding(cycle_ds):
 def cycle_gridding():
     print(f'Gridding files in {INPUT_DIR}')
 
+    if PREPROCESSING == 'GSFC':
+        gsfc_processing()
+
+        exit()
+
     # The main loop
     for date in ALL_DATES:
-        cycle_start = date
-        cycle_end = cycle_start + np.timedelta64(9, 'D')
-        cycle_center = cycle_start + (cycle_end - cycle_start)/2
+        cycle_start = date - np.timedelta64(4, 'D')
+        cycle_end = cycle_start + np.timedelta64(5, 'D')
+        cycle_center = date
 
-        solr_start = f'{cycle_start}'
-        solr_end = f'{cycle_end}'
+        solr_start = f'{cycle_start}'.replace('-', '')
+        solr_end = f'{cycle_end}'.replace('-', '')
 
         try:
             # Get data within cycle period
@@ -394,7 +513,7 @@ def cycle_gridding():
                 continue
 
             print(f'Beginning processing of cycle centered on {cycle_center}')
-            cycle_granules = preprocessers[DS_NAME](cycle_granules)
+            cycle_granules = preprocessers[PREPROCESSING](cycle_granules)
 
             print(f'\tMerging granules for cycle centered on {cycle_center}')
             cycle_ds = merge_granules(cycle_granules)
@@ -406,7 +525,7 @@ def cycle_gridding():
             # Save the gridded cycle
             grid_dir = GRID_OUTPUT_DIR
             grid_dir.mkdir(parents=True, exist_ok=True)
-            filename = f'SSHA_gridded_{str(cycle_center)}.nc'
+            filename = f'SSHA_grid_{str(cycle_center).replace("-", "")}.nc'
             filepath = grid_dir / filename
             encoding = cycle_ds_encoding(gridded_ds)
 

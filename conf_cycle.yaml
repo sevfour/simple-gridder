@@ -1,0 +1,11 @@
+preprocessing: GSFC
+input_dir: "/Users/marlis/Desktop/GSFC"
+output_dir: "/Users/marlis/Desktop/GSFC_grids"
+file_format: .nc
+filename_date_regex: ""
+grid_frequency: 1
+
+gridding_params:
+  roi: 6.0e+5
+  sigma: 1.0E+5
+  neighbours: 500
